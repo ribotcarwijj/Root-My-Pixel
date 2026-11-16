@@ -589,12 +589,26 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val signature = KernelSuInstallChecks.parseManagerSignature(signatureResult.output)
-        if (signature == null || !KernelSuInstallChecks.isTrustedManagerSignature(signature)) {
+        if (signature == null) {
             appendLog(
-                "[!] Installed manager signature is not trusted; registration skipped: " +
+                "[!] Could not parse manager signature; registration skipped: " +
                     signatureResult.output.ifBlank { "unrecognised output" }.take(200),
             )
             return
+        }
+        if (!KernelSuInstallChecks.isTrustedManagerSignature(signature)) {
+            // The installed ReSukiSU manager is not one of the pinned/known
+            // signatures. Newer ReSukiSU releases are signed with a different
+            // certificate, so their size/hash will not match the old allowlist
+            // and registration used to be skipped here, leaving root unusable.
+            // Instead we register the signature that was actually read from the
+            // installed manager APK via `ksud debug get-sign`. The user chose to
+            // install this specific manager, so it is trusted-on-first-use.
+            appendLog(
+                "[*] Installed manager signature not in known list; " +
+                    "registering installed manager anyway " +
+                    "(size=0x${signature.size.toString(16)}, hash=${signature.hash.take(16)}...)",
+            )
         }
 
         appendLog("[*] Registering the ReSukiSU manager with the module...")
